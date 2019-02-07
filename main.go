@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"time"
 )
 
 var speed int = 0
@@ -27,13 +28,33 @@ func fromScratch(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(" * case takeoff detected")
 		speed++
 		cmdFromScratch <- uSplit[1]
+		fmt.Println("uSplit = ", uSplit)
+		time.Sleep(time.Second * 3)
 	case "land":
 		fmt.Println(" * case land detected")
 		speed--
 		cmdFromScratch <- uSplit[1]
-	case "poll":
-		//fmt.Println(" * case poll detected")
-		fmt.Fprintf(w, "speed %v\n", speed)
+		fmt.Println("uSplit = ", uSplit)
+		time.Sleep(time.Second * 3)
+	case "left":
+		fmt.Println(" * case left detected")
+		speed--
+		cmdFromScratch <- uSplit[1] + " " + uSplit[3]
+		fmt.Println("uSplit = ", uSplit)
+		time.Sleep(time.Second * 3)
+	case "right":
+		fmt.Println(" * case right detected")
+		speed--
+		cmdFromScratch <- uSplit[1] + " " + uSplit[3]
+		fmt.Println("uSplit = ", uSplit)
+		time.Sleep(time.Second * 3)
+
+	case "battery":
+		cmdFromScratch <- uSplit[1]
+		fmt.Println("uSplit = ", uSplit)
+		//case "poll":
+		//	//fmt.Println(" * case poll detected")
+		//	fmt.Fprintf(w, "speed %v\n", speed)
 	}
 }
 
@@ -53,7 +74,7 @@ func statusFromTello() {
 			log.Printf("error: reading from udp:8890 buffer %v\n", err)
 		}
 
-		fmt.Printf("*** udp:8890 read: %v\n", string(buf))
+		//fmt.Printf("*** udp:8890 read: %v\n", string(buf))
 	}
 
 }
@@ -71,13 +92,12 @@ func sendToTello() {
 	fmt.Println("remote address = ", conn.RemoteAddr().String())
 
 	//We need to send "command" to enable SDK mode on the Tello befor we can do anything.
-	conn.Write([]byte("command"))
-
+	//conn.Write([]byte("command"))
+	cmdFromScratch <- "command"
 	for {
 		cmd := <-cmdFromScratch
 		fmt.Println("Received from channel = ", cmd)
-		//conn.Write([]byte(cmd))
-		conn.Write([]byte("battery?"))
+		conn.Write([]byte(cmd))
 
 		buf := make([]byte, 1024)
 		n, err := conn.Read(buf)
