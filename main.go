@@ -35,7 +35,6 @@ func fromScratch(w http.ResponseWriter, r *http.Request) {
 		//fmt.Println(" * case poll detected")
 		fmt.Fprintf(w, "speed %v\n", speed)
 	}
-	//fmt.Printf("---- cmdFromScratch = %v\n", cmdFromScratch)
 }
 
 //statusFromTello will pickup all the UDP messages on udp:8890 from the Tello.
@@ -64,21 +63,16 @@ func sendToTello(conn net.Conn) {
 	conn.Write([]byte("command"))
 
 	for {
-		v := <-cmdFromScratch
-		fmt.Println("Received from channel = ", v)
-		conn.Write([]byte(v))
-	}
-}
+		cmd := <-cmdFromScratch
+		fmt.Println("Received from channel = ", cmd)
+		conn.Write([]byte(cmd))
 
-func receiveFromTello(conn net.Conn) {
-	for {
-		fmt.Println("test")
 		buf := make([]byte, 1024)
 		n, err := conn.Read(buf)
 		if err != nil {
 			log.Fatal("error: failed reading the udp", err)
 		}
-		fmt.Printf("read: n=%v, and buf read = %v \n", n, string(buf))
+		fmt.Printf("read: n=%v, and buf read status for %v = %v \n", n, cmd, string(buf))
 	}
 }
 
@@ -95,8 +89,6 @@ func main() {
 	fmt.Println("local address = ", telloConn.LocalAddr().String())
 	fmt.Println("remote address = ", telloConn.RemoteAddr().String())
 	go sendToTello(telloConn)
-
-	go receiveFromTello(telloConn)
 
 	http.HandleFunc("/", fromScratch)
 	http.ListenAndServe(scratchListenHost, nil)
