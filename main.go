@@ -39,33 +39,45 @@ func fromScratch(w http.ResponseWriter, r *http.Request) {
 
 //statusFromTello will pickup all the UDP messages on udp:8890 from the Tello.
 func statusFromTello() {
-	pc, err := net.ListenPacket("udp", "0.0.0:8890")
+	pc, err := net.ListenPacket("udp", ":8890")
 	if err != nil {
-		log.Fatal("error: failed setting up the udp listener.", err)
+		log.Fatal("error: failed setting up the udp:8890 listener.", err)
 	}
-	fmt.Println("started udp listener on pc")
+	defer pc.Close()
+	fmt.Println("started udp:8890 listener on pc")
 
+	buf := make([]byte, 1024)
 	for {
-		buf := make([]byte, 1024)
-		n, addr, err := pc.ReadFrom(buf)
+		_, _, err := pc.ReadFrom(buf)
 		if err != nil {
-			log.Printf("error: reading from udp buffer %v\n", err)
+			log.Printf("error: reading from udp:8890 buffer %v\n", err)
 		}
-		fmt.Printf("udp info about read: n=%v, addr=%v\n", n, addr)
-		fmt.Printf("*** udp read: %v\n", buf)
+
+		fmt.Printf("*** udp:8890 read: %v\n", string(buf))
 	}
 
 }
 
 //sendToTello reads the channel with the commands from Scratch
-func sendToTello(conn net.Conn) {
+func sendToTello() {
+	conn, err := net.Dial("udp", "192.168.10.1:8889")
+	if err != nil {
+		log.Fatal("error: could not connect to tello.")
+	}
+	defer conn.Close()
+
+	fmt.Println("started udp connection to tello")
+	fmt.Println("local address = ", conn.LocalAddr().String())
+	fmt.Println("remote address = ", conn.RemoteAddr().String())
+
 	//We need to send "command" to enable SDK mode on the Tello befor we can do anything.
 	conn.Write([]byte("command"))
 
 	for {
 		cmd := <-cmdFromScratch
 		fmt.Println("Received from channel = ", cmd)
-		conn.Write([]byte(cmd))
+		//conn.Write([]byte(cmd))
+		conn.Write([]byte("battery?"))
 
 		buf := make([]byte, 1024)
 		n, err := conn.Read(buf)
@@ -79,16 +91,8 @@ func sendToTello(conn net.Conn) {
 func main() {
 	cmdFromScratch = make(chan string, 100)
 
-	telloConn, err := net.Dial("udp", "192.168.10.1:8889")
-	if err != nil {
-		log.Fatal("error: could not connect to tello.")
-	}
-	defer telloConn.Close()
-
-	fmt.Println("startet udp connection to tello")
-	fmt.Println("local address = ", telloConn.LocalAddr().String())
-	fmt.Println("remote address = ", telloConn.RemoteAddr().String())
-	go sendToTello(telloConn)
+	go sendToTello()
+	go statusFromTello()
 
 	http.HandleFunc("/", fromScratch)
 	http.ListenAndServe(scratchListenHost, nil)
