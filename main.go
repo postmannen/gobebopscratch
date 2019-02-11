@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"time"
 )
 
 var speed int = 0
@@ -39,7 +40,14 @@ func fromScratch(w http.ResponseWriter, r *http.Request) {
 	case "land":
 		cmdFromScratch <- uSplit[1]
 		fmt.Println(" * case land detected", "uSplit = ", uSplit)
+	case "left":
+		cmdFromScratch <- uSplit[1] + " " + uSplit[3]
+		fmt.Println(" * case left detected", "uSplit = ", uSplit)
+	case "right":
+		cmdFromScratch <- uSplit[1] + " " + uSplit[3]
+		fmt.Println(" * case right detected", "uSplit = ", uSplit)
 	}
+
 }
 
 //sendToTello reads the channel used in the HandlerFunc with the commands delivered from Scratch.
@@ -55,15 +63,24 @@ func sendToTello() {
 	for {
 		cmd := <-cmdFromScratch
 		fmt.Println("Received from channel to write to UDP = ", cmd)
-		conn.Write([]byte(cmd))
 
-		buf := make([]byte, 1024)
-		_, err := conn.Read(buf)
-		if err != nil {
-			log.Fatal("error: failed reading udp:8889", err)
+		for {
+			conn.Write([]byte(cmd))
+			time.Sleep(time.Millisecond * 500)
+			buf := make([]byte, 1024)
+			_, err := conn.Read(buf)
+			if err != nil {
+				log.Fatal("error: failed reading udp:8889", err)
+			}
+			//If received ok command break the inner loop and get a new command.
+			s := string(buf)
+			if strings.HasPrefix(s, "ok") {
+				fmt.Println("received ok, breaking out of check for OK loop to get a new command")
+				break
+			}
+
+			fmt.Printf("read udp:8889: buf read status for \"%v\" = %v \n", cmd, string(buf))
 		}
-
-		fmt.Printf("read udp:8889: buf read status for %v = %v \n", cmd, string(buf))
 	}
 }
 
